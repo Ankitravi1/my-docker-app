@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Generator</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .form-group { margin-bottom: 1em; }
+        label { display: block; margin-bottom: 0.5em; }
+        input, select { width: 100%; padding: 0.5em; box-sizing: border-box; }
+        #loading, #result { margin-top: 1em; }
+        #status-container { margin-top: 2em; }
+        .panel { padding: 1em; border: 1px solid #ccc; background-color: #f9f9f9; }
+        .row { display: flex; gap: 1em; }
+        .col { flex: 1; }
+        .progress { background: #eee; border-radius: 6px; height: 18px; overflow: hidden; }
+        .progress-bar { background: #2196f3; height: 100%; width: 0%; transition: width .3s ease; }
+        /* Export bar specifically green */
+        #export-progress-bar.progress-bar { background: #2e7d32; }
+        .checklist { list-style: none; padding-left: 0; margin: 0; }
+        .checklist li { display: flex; align-items: center; gap: .5em; padding: .4em 0; }
+        .badge { font-size: 12px; padding: 2px 6px; border-radius: 10px; }
+        .badge.done { background: #e8f5e9; color: #2e7d32; }
+        .badge.in_progress { background: #e3f2fd; color: #1565c0; }
+        .badge.pending { background: #f3e5f5; color: #6a1b9a; }
+        .badge.error { background: #ffebee; color: #c62828; }
+        .muted { color: #666; font-size: 0.9em; }
+        .log-entry { margin-bottom: 0.5em; font-family: monospace; white-space: pre-wrap; }
+        .inline { display: inline-block; width: auto; }
+        .half { width: 49%; display: inline-block; }
+        /* Highlighted, bold Download button */
+        .btn-download {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 10px 16px;
+            background: #1976d2;
+            color: #fff;
+            font-weight: 700;
+            text-decoration: none;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        .btn-download:hover { background: #1565c0; }
+    </style>
+</head>
+<body>
+    <h1>Automated Social Video Generator</h1>
+    <form id="video-form" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="project-title">Project Title</label>
+            <input type="text" id="project-title" name="project_title" required>
+        </div>
+        <div class="form-group">
+            <label for="script">Script/Text (for reference)</label>
+            <textarea id="script" name="script" rows="4" style="width:100%;"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="audio">Audio File (.mp3)</label>
+            <input type="file" id="audio" name="audio" accept=".mp3" required>
+        </div>
+        <div class="form-group">
+            <label for="images">Image Files (.jpg, .png)</label>
+            <input type="file" id="images" name="images" accept=".jpg,.jpeg,.png" multiple required>
+        </div>
+        <fieldset class="panel" style="margin-top:1em;">
+            <legend>Caption Settings</legend>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="font">Font Family</label>
+                        <select id="font" name="font">
+                            <option value="Impact" selected>Impact (stylized)</option>
+                            <option value="Arial">Arial</option>
+                            <option value="Roboto">Roboto</option>
+                            <option value="Verdana">Verdana</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="font-size">Font Size (H1 default)</label>
+                        <input type="number" id="font-size" name="font_size" min="18" value="120">
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="font-color">Font Color</label>
+                        <input type="color" id="font-color" name="font_color" value="#FFFFFF">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="position_vertical">Vertical Position on 9:16 (distance from bottom)</label>
+                <input type="range" id="position_vertical" name="position_vertical" min="10" max="100" step="10" value="80">
+                <span id="position-value">80%</span>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label><input class="inline" type="checkbox" id="caption_auto" name="caption_auto" checked> Auto-generate captions (AssemblyAI)</label>
+                        <div class="muted">Provide an SRT to override auto captions.</div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="srt">Optional SRT File</label>
+                        <input type="file" id="srt" name="srt" accept=".srt">
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+        <button type="submit" id="generate-btn">Generate Video</button>
+    </form>
+
+    <div id="loading" style="display:none;">
+        <p>Generating video, this may take a few minutes...</p>
+        <div class="progress" title="Overall Progress"><div id="progress-bar" class="progress-bar"></div></div>
+        <div class="muted" id="progress-text">0%</div>
+        <div class="muted" id="elapsed-time">Time: 00:00</div>
+        <div style="height:8px"></div>
+        <div class="progress" title="Export Progress"><div id="export-progress-bar" class="progress-bar"></div></div>
+        <div class="muted" id="export-progress-text">Export 0%</div>
+    </div>
+    <div id="result"></div>
+
+    <div id="status-container" style="display:none;">
+        <div class="row">
+            <div class="col panel">
+                <h3>Checklist</h3>
+                <ul id="status-checklist" class="checklist"></ul>
+            </div>
+            <div class="col panel">
+                <h3>Logs</h3>
+                <div id="status-logs" style="max-height:240px; overflow:auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
