@@ -14,19 +14,7 @@
         .panel { padding: 1em; border: 1px solid #ccc; background-color: #f9f9f9; }
         .row { display: flex; gap: 1em; }
         .col { flex: 1; }
-        .progress { background: #eee; border-radius: 6px; height: 18px; overflow: hidden; }
-        .progress-bar { background: #2196f3; height: 100%; width: 0%; transition: width .3s ease; }
-        /* Export bar specifically green */
-        #export-progress-bar.progress-bar { background: #2e7d32; }
-        .checklist { list-style: none; padding-left: 0; margin: 0; }
-        .checklist li { display: flex; align-items: center; gap: .5em; padding: .4em 0; }
-        .badge { font-size: 12px; padding: 2px 6px; border-radius: 10px; }
-        .badge.done { background: #e8f5e9; color: #2e7d32; }
-        .badge.in_progress { background: #e3f2fd; color: #1565c0; }
-        .badge.pending { background: #f3e5f5; color: #6a1b9a; }
-        .badge.error { background: #ffebee; color: #c62828; }
         .muted { color: #666; font-size: 0.9em; }
-        .log-entry { margin-bottom: 0.5em; font-family: monospace; white-space: pre-wrap; }
         .inline { display: inline-block; width: auto; }
         .half { width: 49%; display: inline-block; }
         /* Highlighted, bold Download button */
@@ -51,17 +39,29 @@
             <label for="project-title">Project Title</label>
             <input type="text" id="project-title" name="project_title" required>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="display:none;">
             <label for="script">Script/Text (for reference)</label>
             <textarea id="script" name="script" rows="4" style="width:100%;"></textarea>
         </div>
         <div class="form-group">
-            <label for="audio">Audio File (.mp3)</label>
-            <input type="file" id="audio" name="audio" accept=".mp3" required>
+            <label for="drive_link">Google Drive Folder Link</label>
+            <input type="url" id="drive_link" name="drive_link" placeholder="https://drive.google.com/drive/folders/...">
+            <div class="muted">Recommended. Files from this folder will be used. Ensure sharing is set to "Anyone with the link: Viewer".</div>
         </div>
         <div class="form-group">
-            <label for="images">Image Files (.jpg, .png)</label>
-            <input type="file" id="images" name="images" accept=".jpg,.jpeg,.png" multiple required>
+            <label for="audio">Audio File (.mp3) <span class="muted inline">(optional)</span></label>
+            <input type="file" id="audio" name="audio" accept=".mp3">
+        </div>
+        <div class="form-group">
+            <label for="images">Image Files (.jpg, .png, .webp) <span class="muted inline">(optional)</span></label>
+            <input type="file" id="images" name="images" accept=".jpg,.jpeg,.png,.webp" multiple>
+        </div>
+        <div class="form-group">
+            <label for="aspect_ratio">Video Ratio</label>
+            <select id="aspect_ratio" name="aspect_ratio">
+                <option value="9:16" selected>9:16 (Vertical)</option>
+                <option value="16:9">16:9 (Horizontal)</option>
+            </select>
         </div>
         <fieldset class="panel" style="margin-top:1em;">
             <legend>Caption Settings</legend>
@@ -101,10 +101,21 @@
                 <div class="col">
                     <div class="form-group">
                         <label><input class="inline" type="checkbox" id="caption_auto" name="caption_auto" checked> Auto-generate captions (AssemblyAI)</label>
-                        <div class="muted">Provide an SRT to override auto captions.</div>
+                        <div class="muted" style="display:none;">Provide an SRT to override auto captions.</div>
                     </div>
                 </div>
                 <div class="col">
+                    <div class="form-group">
+                        <label><input class="inline" type="checkbox" id="background_music" name="background_music" checked> Add background music</label>
+                        <div class="muted">Uses Pulsar.mp3 and trims/loops to match audio duration.</div>
+                        <div class="form-group" style="margin-top:8px;">
+                            <label for="background_music_level">Background music level: <span id="bgm-level-value">4%</span></label>
+                            <input type="range" id="background_music_level" name="background_music_level" min="4" max="12" step="2" value="4">
+                            <div class="muted">Available levels: 4%, 6%, 8%, 10%, 12%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col" style="display:none;">
                     <div class="form-group">
                         <label for="srt">Optional SRT File</label>
                         <input type="file" id="srt" name="srt" accept=".srt">
@@ -117,24 +128,18 @@
 
     <div id="loading" style="display:none;">
         <p>Generating video, this may take a few minutes...</p>
-        <div class="progress" title="Overall Progress"><div id="progress-bar" class="progress-bar"></div></div>
-        <div class="muted" id="progress-text">0%</div>
-        <div class="muted" id="elapsed-time">Time: 00:00</div>
-        <div style="height:8px"></div>
-        <div class="progress" title="Export Progress"><div id="export-progress-bar" class="progress-bar"></div></div>
-        <div class="muted" id="export-progress-text">Export 0%</div>
     </div>
     <div id="result"></div>
 
     <div id="status-container" style="display:none;">
-        <div class="row">
-            <div class="col panel">
-                <h3>Checklist</h3>
-                <ul id="status-checklist" class="checklist"></ul>
+        <div class="muted" id="elapsed-time" style="margin-bottom:8px;">Time: 00:00</div>
+        <div class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <strong>Progress</strong>
+                <span id="progress-text" class="muted">0%</span>
             </div>
-            <div class="col panel">
-                <h3>Logs</h3>
-                <div id="status-logs" style="max-height:240px; overflow:auto;"></div>
+            <div style="background:#eee; height:12px; border-radius:6px; overflow:hidden;">
+                <div id="progress-bar" style="height:12px; width:0%; background:#1976d2; border-radius:6px;"></div>
             </div>
         </div>
     </div>

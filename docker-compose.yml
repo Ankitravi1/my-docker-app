@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    # If you push to a registry, you can replace build with image: your-repo/your-app:tag
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8080:8080" # expose only to localhost; Nginx will proxy
+    restart: unless-stopped
+    volumes:
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+      - ./resource:/app/resource:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

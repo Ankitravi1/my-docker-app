@@ -3,3 +3,5 @@ moviepy==1.0.3
 Pillow==9.5.0
 python-dotenv==1.0.0
 assemblyai
+gdown==5.2.0
+gunicorn==21.2.0
